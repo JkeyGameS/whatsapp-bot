@@ -94,7 +94,51 @@ async function startBot() {
 
             console.log(`📩 Message from ${from}: ${text}`);
 
-            // Reply
+            // -----------------------------
+// MENU COMMAND
+// -----------------------------
+if (text.toLowerCase() === "/menu") {
+    await sock.sendMessage(from, {
+        text: `🤖 *WhatsApp AI Bot*
+
+📋 Available Commands
+
+/menu - Show this menu
+/ping - Check if bot is online
+/hello - Say hello
+
+More commands coming soon!`
+    });
+
+    return; // IMPORTANT
+}
+
+// -----------------------------
+// PING COMMAND
+// -----------------------------
+if (text.toLowerCase() === "/ping") {
+    await sock.sendMessage(from, {
+        text: "🏓 Pong!"
+    });
+
+    return;
+}
+
+// -----------------------------
+// HELLO COMMAND
+// -----------------------------
+if (text.toLowerCase() === "/hello") {
+    await sock.sendMessage(from, {
+        text: "👋 Hello!"
+    });
+
+    return;
+}
+
+// -----------------------------
+// DEFAULT REPLY
+// -----------------------------
+
             await sock.sendMessage(from, {
                 text: `Hello! You said: "${text}"`
             });
