@@ -1,162 +1,48 @@
-const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason
-} = require("@whiskeysockets/baileys");
+const command = text.trim().toLowerCase();
+const isGroup = from.endsWith("@g.us");
 
-const qrcode = require("qrcode-terminal");
-const express = require("express");
+// Your WhatsApp number (no +, no spaces)
+const OWNER_NUMBER = "233XXXXXXXXX";
 
-// -----------------------------
-// Express server (required for Render Web Service)
-// -----------------------------
-const app = express();
-const PORT = process.env.PORT || 3000;
+// Who sent the message?
+const sender = isGroup ? msg.key.participant : msg.key.remoteJid;
 
-app.get("/", (req, res) => {
-    res.send("✅ WhatsApp Bot is running!");
-});
+// Is it you?
+const isOwner = sender.startsWith(OWNER_NUMBER);
 
-app.get("/health", (req, res) => {
-    res.json({
-        status: "online",
-        service: "WhatsApp Bot"
-    });
-});
+if (command === "/menu") {
 
-app.listen(PORT, () => {
-    console.log(`🌐 Server running on port ${PORT}`);
-});
+    // In a group, only allow owner or admins
+    if (isGroup) {
+        const metadata = await sock.groupMetadata(from);
 
-// -----------------------------
-// WhatsApp Bot
-// -----------------------------
-async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState("./auth");
+        const isAdmin = metadata.participants.some(
+            p =>
+                p.id === sender &&
+                (p.admin === "admin" || p.admin === "superadmin")
+        );
 
-    const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: false
-    });
-
-    // Save authentication whenever it changes
-    sock.ev.on("creds.update", saveCreds);
-
-    // Connection events
-    sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
-
-        if (qr) {
-            console.log("📱 Scan this QR code with WhatsApp:");
-            qrcode.generate(qr, { small: true });
+        if (!isOwner && !isAdmin) {
+            return; // Ignore silently
         }
+    }
 
-        if (connection === "open") {
-            console.log("✅ WhatsApp Connected!");
-        }
+    // In a private chat, only allow you
+    if (!isGroup && !isOwner) {
+        return;
+    }
 
-        if (connection === "close") {
-            console.log("❌ Connection closed.");
-
-            const shouldReconnect =
-                lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-
-            if (shouldReconnect) {
-                console.log("🔄 Reconnecting...");
-                setTimeout(startBot, 5000);
-            } else {
-                console.log("🚪 Logged out. Scan the QR code again.");
-            }
-        }
-    });
-
-    // Incoming messages
-    sock.ev.on("messages.upsert", async ({ messages }) => {
-        try {
-            const msg = messages[0];
-
-            if (!msg || !msg.message) return;
-
-            const from = msg.key.remoteJid;
-
-            // Ignore messages sent by the bot
-            if (msg.key.fromMe) return;
-
-            // Ignore WhatsApp Status updates
-            if (from === "status@broadcast") return;
-
-            // Extract text
-            const text =
-                msg.message.conversation ||
-                msg.message.extendedTextMessage?.text ||
-                "";
-
-            if (!text) return;
-
-            console.log(`📩 Message from ${from}: ${text}`);
-
-            // -----------------------------
-// MENU COMMAND
-// -----------------------------
-if (text.toLowerCase() === "/menu") {
     await sock.sendMessage(from, {
-        text: `🤖 *WhatsApp AI Bot*
+        text: `🤖 *WhatsApp Bot*
 
 📋 Available Commands
 
-/menu - Show this menu
-/ping - Check if bot is online
-/hello - Say hello
+/menu
+/ping
+/hello
 
 More commands coming soon!`
     });
 
-    return; // IMPORTANT
-}
-
-// -----------------------------
-// PING COMMAND
-// -----------------------------
-if (text.toLowerCase() === "/ping") {
-    await sock.sendMessage(from, {
-        text: "🏓 Pong!"
-    });
-
     return;
 }
-
-// -----------------------------
-// HELLO COMMAND
-// -----------------------------
-if (text.toLowerCase() === "/hello") {
-    await sock.sendMessage(from, {
-        text: "👋 Hello!"
-    });
-
-    return;
-}
-
-// -----------------------------
-// DEFAULT REPLY
-// -----------------------------
-
-            await sock.sendMessage(from, {
-                text: `Hello! You said: "${text}"`
-            });
-
-        } catch (err) {
-            console.error("❌ Error handling message:", err);
-        }
-    });
-}
-
-// Start the bot
-startBot().catch(console.error);
-
-// Prevent crashes
-process.on("uncaughtException", (err) => {
-    console.error("❌ Uncaught Exception:", err);
-});
-
-process.on("unhandledRejection", (err) => {
-    console.error("❌ Unhandled Rejection:", err);
-});
